@@ -71,7 +71,7 @@ tail -f /opt/coupon-bot/data/logs/bot.log   # логи у файлі (ротац
 ssh-keygen -t ed25519 -f /root/.ssh/coupon_deploy_key -N ""
 cat /root/.ssh/coupon_deploy_key.pub    # додай у GitHub: репозиторій → Settings → Deploy keys (без права запису)
 cd /opt/coupon-bot
-git init -q -b main && git remote add origin git@github.com:OWNER/coupon-bot.git
+git init -q -b main && git remote add origin git@github.com:ostd6212/coupon-bot.git
 git config core.sshCommand "ssh -i /root/.ssh/coupon_deploy_key -o IdentitiesOnly=yes"
 git fetch origin main && git reset --hard FETCH_HEAD
 ```
