@@ -58,3 +58,9 @@ def test_old_database_gets_partner_column_and_backfill(tmp_path):
 
 def test_summary_has_no_value_line_and_no_edit_button_text():
     assert "Цінність" not in summary(mk(value="5 EUR"))
+
+
+def test_dates_are_bold_in_summary_and_caption():
+    c = mk(valid_from="2026-10-19", valid_to="2026-11-01")
+    assert "Діє: з <b>19.10.2026</b> до <b>01.11.2026</b>" in summary(c)
+    assert "Діє: <b>19.10.2026 – 01.11.2026</b>" in caption(c)

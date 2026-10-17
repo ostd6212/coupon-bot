@@ -36,7 +36,7 @@ def caption(c: Coupon, heading: str | None = None) -> str:
     lines.append(f"{TYPE_ICON.get(c.type, '🎟')} <b>{escape(c.title)}</b>")
     if c.min_purchase_eur:
         lines.append(f"Умова: від {money(c.min_purchase_eur)} €")
-    lines.append(f"Діє: {period(c)}")
+    lines.append(f"Діє: <b>{period(c)}</b>")
     if c.stores:
         lines.append(f"Де: {escape(c.stores)}")
     if c.requires_club_card:
@@ -52,7 +52,7 @@ def summary(c: Coupon) -> str:
     lines.append(f"{TYPE_ICON.get(c.type, '🎟')} <b>{escape(c.title)}</b>")
     if c.min_purchase_eur:
         lines.append(f"Умова: від {money(c.min_purchase_eur)} €")
-    lines.append(f"Діє: {'з ' + fmt(c.start) + ' ' if c.start else ''}до {fmt(c.end)}")
+    lines.append(f"Діє: {'з <b>' + fmt(c.start) + '</b> ' if c.start else ''}до <b>{fmt(c.end)}</b>")
     if c.stores:
         lines.append(f"Де: {escape(c.stores)}")
     if c.requires_club_card:
