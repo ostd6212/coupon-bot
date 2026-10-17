@@ -203,6 +203,8 @@ async def on_shop(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     if not coupons:
         await update.message.reply_text("Сьогодні немає чинних купонів.")
         return
+    partners = [c for c in coupons if c.partner]
+    coupons = [c for c in coupons if not c.partner]  # partner coupons are not shown at the Carrefour till
     by_photo: dict[Path, list[Coupon]] = {}
     for c in coupons:
         if f := _photo_file(cfg, c):
@@ -220,7 +222,9 @@ async def on_shop(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
             await with_retry(lambda: update.message.reply_photo(chunk[0].media, caption=chunk[0].caption))
         else:
             await with_retry(lambda: update.message.reply_media_group(chunk))
-    await update.message.reply_text(render.shop_summary(coupons), parse_mode=HTML)
+    if not coupons:
+        await update.message.reply_text("Сьогодні немає чинних купонів Carrefour.")
+    await update.message.reply_text(render.shop_summary(coupons, partners), parse_mode=HTML)
 
 
 # -- buttons and the "fix date" dialogue -------------------------------------

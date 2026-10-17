@@ -29,11 +29,17 @@ def days_left(c: Coupon, today: date) -> str:
     return {0: "сьогодні останній день", 1: "лишився 1 день"}.get(n, f"лишилось {n} дн.")
 
 
+def partner_line(c: Coupon) -> str | None:
+    return f"🏪 <b>ПАРТНЕР: {escape(c.partner)}</b> (не в Carrefour)" if c.partner else None
+
+
 def caption(c: Coupon, heading: str | None = None) -> str:
     """Photo caption for reminders and /shop (Telegram limit: 1024 chars)."""
     lines = []
     if heading:
         lines.append(f"<b>{escape(heading)}</b>")
+    if line := partner_line(c):
+        lines.append(line)
     lines.append(f"{TYPE_ICON.get(c.type, '🎟')} <b>{escape(c.title)}</b>")
     if c.min_purchase_eur:
         lines.append(f"Умова: від {money(c.min_purchase_eur)} €")
@@ -49,7 +55,8 @@ def caption(c: Coupon, heading: str | None = None) -> str:
 
 def summary(c: Coupon) -> str:
     """Shown right after recognition."""
-    lines = [f"{TYPE_ICON.get(c.type, '🎟')} <b>{escape(c.title)}</b>"]
+    lines = [partner_line(c)] if c.partner else []
+    lines.append(f"{TYPE_ICON.get(c.type, '🎟')} <b>{escape(c.title)}</b>")
     if c.value:
         lines.append(f"Цінність: {escape(c.value)}")
     if c.min_purchase_eur:
@@ -72,14 +79,18 @@ def list_lines(coupons: list[Coupon], today: date, limit: int = 40) -> str:
     out = []
     for i, c in enumerate(coupons[:limit], 1):
         when = f"з {fmt(c.start)} " if c.start and c.start > today else ""
-        out.append(f"{i}. <b>{escape(c.title)}</b>\n    {when}до {fmt(c.end)} ({days_left(c, today)})")
+        shop = f"🏪 {escape(c.partner)}: " if c.partner else ""
+        out.append(f"{i}. {shop}<b>{escape(c.title)}</b>\n    {when}до {fmt(c.end)} ({days_left(c, today)})")
     if len(coupons) > limit:
         out.append(f"… і ще {len(coupons) - limit}")
     return "\n".join(out)
 
 
-def shop_summary(coupons: list[Coupon]) -> str:
-    """'What do I get at which basket size': cumulative by purchase threshold."""
+def shop_summary(coupons: list[Coupon], partner_coupons: list[Coupon] = ()) -> str:
+    """'What do I get at which basket size': cumulative by purchase threshold.
+
+    Partner coupons (Feu Vert, ...) cannot be redeemed at the Carrefour till, so they are listed apart.
+    """
     coupons = sorted(coupons, key=lambda c: c.min_purchase_eur or 0)
     thresholds = sorted({c.min_purchase_eur or 0 for c in coupons})
     lines = ["<b>Що спрацює на касі:</b>"]
@@ -89,4 +100,7 @@ def shop_summary(coupons: list[Coupon]) -> str:
         lines.append(f"• {label} = {' + '.join(titles)}")
     if any(c.requires_club_card for c in coupons):
         lines.append("\n💳 Деякі купони потребують картки Club.")
+    if partner_coupons:
+        lines.append("\n🏪 <b>У партнерів (не на касі Carrefour):</b>")
+        lines += [f"• {escape(c.partner)}: {escape(c.title)} (до {fmt(c.end)})" for c in partner_coupons]
     return "\n".join(lines)

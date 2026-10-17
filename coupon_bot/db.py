@@ -6,6 +6,7 @@ from datetime import date, datetime
 from pathlib import Path
 
 from .dates import parse_iso
+from .partners import known_partner
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS coupons (
@@ -24,6 +25,7 @@ CREATE TABLE IF NOT EXISTS coupons (
     barcode TEXT,
     raw_text TEXT,
     photo_path TEXT,
+    partner TEXT,
     status TEXT NOT NULL DEFAULT 'active',
     created_at TEXT NOT NULL,
     used_at TEXT
@@ -56,6 +58,7 @@ class Coupon:
     barcode: str | None
     raw_text: str | None
     photo_path: str | None
+    partner: str | None
     status: str
     created_at: str
     used_at: str | None
@@ -83,6 +86,18 @@ class Database:
         self.conn = sqlite3.connect(str(path), check_same_thread=False)
         self.conn.row_factory = sqlite3.Row
         self.conn.executescript(SCHEMA)
+        self._migrate()
+
+    def _migrate(self) -> None:
+        """Databases created before the 'partner' column get it, and known partners are filled in."""
+        cols = {r["name"] for r in self.conn.execute("PRAGMA table_info(coupons)")}
+        if "partner" in cols:
+            return
+        self.conn.execute("ALTER TABLE coupons ADD COLUMN partner TEXT")
+        for r in self.conn.execute("SELECT id, title, stores FROM coupons").fetchall():
+            if p := known_partner(r["stores"], r["title"]):
+                self.conn.execute("UPDATE coupons SET partner=? WHERE id=?", (p, r["id"]))
+        self.conn.commit()
 
     # -- coupons ---------------------------------------------------------
     def add_coupon(self, user_id: int, data: dict, photo_path: str | None, created_at: str | None = None) -> int:
@@ -90,13 +105,13 @@ class Database:
         cur = self.conn.execute(
             """INSERT INTO coupons (user_id, type, title, value, min_purchase_eur, valid_from, valid_to,
                    stores, requires_club_card, ends_saturday_if_sunday_closed, conditions_uk, barcode,
-                   raw_text, photo_path, status, created_at)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?, 'active', ?)""",
+                   raw_text, photo_path, partner, status, created_at)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, 'active', ?)""",
             (
                 user_id, data["type"], data["title"], data.get("value"), data.get("min_purchase_eur"),
                 data.get("valid_from"), data["valid_to"], data.get("stores"),
                 int(bool(data.get("requires_club_card"))), int(bool(data.get("ends_saturday_if_sunday_closed"))),
-                data.get("conditions_uk"), data.get("barcode"), data.get("raw_text"), photo_path, created_at,
+                data.get("conditions_uk"), data.get("barcode"), data.get("raw_text"), photo_path, data.get("partner"), created_at,
             ),
         )
         self.conn.commit()

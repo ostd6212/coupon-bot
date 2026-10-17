@@ -8,6 +8,7 @@ import re
 from datetime import date
 
 from .dates import parse_iso, parse_validity
+from .partners import clean_partner, known_partner
 
 log = logging.getLogger(__name__)
 
@@ -26,6 +27,7 @@ no markdown, no commentary. Each element has exactly these keys:
  "valid_from": "YYYY-MM-DD" or null,
  "valid_to": "YYYY-MM-DD",
  "stores": "where it is valid, as printed, e.g. Hiper, Market, Express, carrefour.es | only Hipermercado | Feu Vert",
+ "partner": "name of the partner company if the coupon is redeemed at a third party and NOT in Carrefour stores or carrefour.es (e.g. Feu Vert), otherwise null",
  "requires_club_card": true or false,
  "ends_saturday_if_sunday_closed": true or false,
  "conditions_uk": "1-3 short sentences in Ukrainian: restrictions and exceptions",
@@ -102,6 +104,8 @@ def normalize_coupon(raw: dict, today: date) -> dict | None:
         start, end = end, start
     ctype = _str(raw.get("type")) or "other"
     value = _str(raw.get("value"))
+    stores = _str(raw.get("stores"))
+    partner = clean_partner(_str(raw.get("partner"))) or known_partner(stores, _str(raw.get("title")))
     digits = re.sub(r"\D", "", str(raw.get("barcode") or ""))
     return {
         "type": ctype if ctype in TYPES else "other",
@@ -111,6 +115,7 @@ def normalize_coupon(raw: dict, today: date) -> dict | None:
         "valid_from": start.isoformat() if start else None,
         "valid_to": end.isoformat(),
         "stores": _str(raw.get("stores")),
+        "partner": partner,
         "requires_club_card": _bool(raw.get("requires_club_card")),
         "ends_saturday_if_sunday_closed": _bool(raw.get("ends_saturday_if_sunday_closed")) and end.weekday() == 6,
         "conditions_uk": _str(raw.get("conditions_uk")),
