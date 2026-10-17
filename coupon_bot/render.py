@@ -6,6 +6,7 @@ from html import escape
 
 from .dates import fmt
 from .db import Coupon
+from .reminders import HEADINGS, Planned
 
 TYPE_ICON = {"discount": "💸", "gift": "🎁", "chequeahorro": "🧾", "cashback": "🔁", "other": "🎟"}
 
@@ -106,6 +107,26 @@ def list_text(current: list[Coupon], upcoming: list[Coupon], today: date, hidden
     if hidden:
         blocks.append(f"… і ще {hidden}")
     return "\n\n".join(blocks)
+
+
+def _relative(day: date, today: date) -> str:
+    n = (day - today).days
+    return "сьогодні" if n == 0 else "завтра" if n == 1 else f"через {n} дн."
+
+
+def reminders_text(planned: list[Planned], today: date, hidden: int = 0) -> str:
+    """Scheduled reminders grouped by send time; numbers match the 👁 preview buttons."""
+    lines = [f"<b>🔔 Заплановані нагадування ({len(planned) + hidden})</b>"]
+    slot = None
+    for i, p in enumerate(planned, 1):
+        if (p.day, p.hour) != slot:
+            slot = (p.day, p.hour)
+            lines.append(f"\n<b>{short_date(p.day, today)} · {p.hour:02d}:00</b> ({_relative(p.day, today)})")
+        shop = f"🏪 {escape(p.coupon.partner)}: " if p.coupon.partner else ""
+        lines.append(f"{i}. {HEADINGS[p.kind]} — {shop}<b>{escape(p.coupon.title)}</b>")
+    if hidden:
+        lines.append(f"\n… і ще {hidden}")
+    return "\n".join(lines)
 
 
 def shop_summary(coupons: list[Coupon], partner_coupons: list[Coupon] = ()) -> str:

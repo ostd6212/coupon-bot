@@ -56,3 +56,28 @@ def test_no_countdown_before_a_coupon_starts():
 
 def test_regular_coupon_has_no_evening_reminder():
     assert evening_kind(mk(valid_from="2026-10-19", valid_to="2026-11-14"), D(2026, 10, 18)) is None
+
+
+def _plan(coupons, now, sent=None):
+    from datetime import datetime
+    from coupon_bot.reminders import upcoming
+    return [(p.day.isoformat(), p.hour, p.kind) for p in upcoming(coupons, datetime.fromisoformat(now), 9, 19, sent or {})]
+
+
+def test_upcoming_lists_the_same_reminders_the_jobs_will_send():
+    c = mk(valid_from="2026-10-19", valid_to="2026-11-01", ends_saturday_if_sunday_closed=True)
+    assert _plan([c], "2026-10-17T12:00") == [
+        ("2026-10-19", 9, "start"), ("2026-10-29", 9, "d3"), ("2026-10-31", 9, "sat"), ("2026-11-01", 9, "last")]
+
+
+def test_upcoming_short_promo_has_evening_slot():
+    c = mk(valid_from="2026-10-23", valid_to="2026-10-24")
+    assert _plan([c], "2026-10-17T12:00") == [
+        ("2026-10-22", 19, "eve"), ("2026-10-23", 9, "start"), ("2026-10-24", 9, "last")]
+
+
+def test_upcoming_skips_todays_slots_that_are_over_or_already_sent():
+    c = mk(valid_to="2026-11-14")
+    assert _plan([c], "2026-11-14T08:00") == [("2026-11-14", 9, "last")]
+    assert _plan([c], "2026-11-14T10:00") == []  # 9:00 has passed
+    assert _plan([c], "2026-11-14T08:00", {1: {"last"}}) == []  # already delivered

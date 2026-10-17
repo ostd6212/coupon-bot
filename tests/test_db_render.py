@@ -84,3 +84,16 @@ def test_list_text_sections_numbers_dates_and_urgency():
     assert "3. 🎁 <b>Lindt</b>" in text  # numbering continues into the second section
     assert "<b>пт 23.10 – сб 24.10</b> · 🕐 почнеться через 6 дн." in text
     assert "ще 7 дн." not in text  # the old misleading "days left" for a coupon that has not started
+
+
+def test_reminders_text_groups_by_slot_and_numbers_items():
+    from coupon_bot.render import reminders_text
+    from coupon_bot.reminders import Planned
+    today = date(2026, 10, 17)
+    a, b = mk(id=1, title="Lindt"), mk(id=2, title="−5 €", partner="Feu Vert")
+    text = reminders_text([Planned(date(2026, 10, 22), 19, "eve", a), Planned(date(2026, 10, 23), 9, "start", a),
+                           Planned(date(2026, 10, 23), 9, "start", b)], today)
+    assert "<b>чт 22.10 · 19:00</b> (через 5 дн.)" in text
+    assert text.count("<b>пт 23.10 · 09:00</b>") == 1  # one header for two reminders in the same slot
+    assert "1. 🌙 Завтра починає діяти купон — <b>Lindt</b>" in text
+    assert "3. 🟢 Сьогодні почав діяти купон — 🏪 Feu Vert: <b>−5 €</b>" in text

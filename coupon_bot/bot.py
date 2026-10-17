@@ -24,7 +24,7 @@ from .config import Config, load_config
 from .dates import fmt
 from .db import Coupon, Database
 from .recognize import recognize
-from .reminders import HEADINGS, evening_kind, morning_kinds
+from .reminders import HEADINGS, evening_kind, morning_kinds, upcoming
 
 log = logging.getLogger(__name__)
 HTML = ParseMode.HTML
@@ -35,7 +35,7 @@ START_TEXT = (
     "👋 Привіт! Надішли мені фото купона Carrefour (можна кілька фото або альбом), "
     "і я збережу його та нагадаю вчасно: коли почне діяти, за 3 дні, за день і в останній день.\n\n"
     "/active — що діє зараз\n/upcoming — що ще не почало діяти\n/all — усе разом\n"
-    "/shop — «я в магазині»: фото всіх чинних купонів\n/help — довідка"
+    "/shop — «я в магазині»: фото всіх чинних купонів\n/reminders — заплановані нагадування\n/help — довідка"
 )
 HELP_TEXT = (
     START_TEXT + "\n\nПорада: фото краще надсилати як зображення, а не файл, і щоб було видно дати та штрихкод. "
@@ -229,6 +229,36 @@ async def on_shop(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(render.shop_summary(coupons, partners), parse_mode=HTML)
 
 
+async def on_reminders(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    cfg, db = _cfg(ctx), _db(ctx)
+    now = datetime.now(cfg.tz)
+    coupons = db.list_active()
+    sent = {c.id: db.reminders_sent(c.id) for c in coupons}
+    planned = upcoming(coupons, now, cfg.reminder_hour, cfg.evening_hour, sent)
+    if not planned:
+        await update.message.reply_text("Запланованих нагадувань немає.")
+        return
+    shown = planned[:30]
+    buttons = [InlineKeyboardButton(f"👁 {i}", callback_data=f"prev:{p.coupon.id}:{p.kind}")
+               for i, p in enumerate(shown, 1)]
+    rows = [buttons[i:i + 5] for i in range(0, len(buttons), 5)]
+    await update.message.reply_text(
+        render.reminders_text(shown, now.date(), len(planned) - len(shown)) + "\n\n👁 — показати, як виглядатиме нагадування.",
+        parse_mode=HTML, reply_markup=InlineKeyboardMarkup(rows))
+
+
+async def on_preview(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    q = update.callback_query
+    _, raw_id, kind = q.data.split(":")
+    c = _db(ctx).get(int(raw_id))
+    if c is None or kind not in HEADINGS:
+        await q.answer("Купон не знайдено")
+        return
+    await q.answer()
+    await with_retry(lambda: ctx.bot.send_message(q.message.chat_id, "👁 Так виглядатиме нагадування:"))
+    await send_coupon(ctx.bot, q.message.chat_id, _cfg(ctx), c, HEADINGS[kind])
+
+
 # -- buttons and the "fix date" dialogue -------------------------------------
 
 async def _finish(query, note: str) -> None:
@@ -327,6 +357,7 @@ async def post_init(app: Application) -> None:
         BotCommand("upcoming", "Ще не почали діяти"),
         BotCommand("all", "Усі активні й майбутні"),
         BotCommand("shop", "Я в магазині: фото чинних купонів"),
+        BotCommand("reminders", "Заплановані нагадування"),
         BotCommand("help", "Довідка"),
     ])
 
@@ -353,7 +384,9 @@ def build_application(cfg: Config) -> Application:
     app.add_handler(CommandHandler("upcoming", on_upcoming))
     app.add_handler(CommandHandler("all", on_all))
     app.add_handler(CommandHandler("shop", on_shop))
+    app.add_handler(CommandHandler("reminders", on_reminders))
     app.add_handler(MessageHandler(filters.PHOTO | filters.Document.IMAGE, on_photo))
+    app.add_handler(CallbackQueryHandler(on_preview, pattern=r"^prev:\d+:[a-z0-9]+$"))
     app.add_handler(CallbackQueryHandler(on_button, pattern=r"^(del|used|photo):\d+$"))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, on_text))
     app.add_error_handler(on_error)

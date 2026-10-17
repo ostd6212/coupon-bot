@@ -1,7 +1,8 @@
 """Which reminder (if any) is due for a coupon on a given day. Pure functions, no I/O."""
 from __future__ import annotations
 
-from datetime import date, timedelta
+from dataclasses import dataclass
+from datetime import date, datetime, timedelta
 
 from .db import Coupon
 
@@ -44,3 +45,29 @@ def evening_kind(c: Coupon, today: date) -> str | None:
     if is_short(c) and c.start is not None and today == c.start - timedelta(days=1):
         return "eve"
     return None
+
+
+@dataclass
+class Planned:
+    day: date
+    hour: int
+    kind: str
+    coupon: Coupon
+
+
+def upcoming(coupons: list[Coupon], now: datetime, reminder_hour: int, evening_hour: int,
+             sent: dict[int, set[str]], horizon_days: int = 60) -> list[Planned]:
+    """Reminders that will still be sent, using the very same rules as the scheduled jobs."""
+    today, out = now.date(), []
+    for c in coupons:
+        already = sent.get(c.id, set())
+        day = today
+        while day <= min(c.end, today + timedelta(days=horizon_days)):
+            kinds = morning_kinds(c, day)
+            if kinds and not (day == today and (now.hour >= reminder_hour or already & set(kinds))):
+                out.append(Planned(day, reminder_hour, kinds[0], c))
+            eve = evening_kind(c, day)
+            if eve and not (day == today and (now.hour >= evening_hour or eve in already)):
+                out.append(Planned(day, evening_hour, eve, c))
+            day += timedelta(days=1)
+    return sorted(out, key=lambda p: (p.day, p.hour, p.coupon.end, p.coupon.id))
