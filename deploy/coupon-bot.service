@@ -1,0 +1,20 @@
+# Reference copy of the unit that deploy/setup_server.sh writes (it fills in the paths).
+#   journalctl -u coupon-bot -f      # logs
+[Unit]
+Description=Carrefour coupon reminder bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=couponbot
+WorkingDirectory=/opt/coupon-bot
+EnvironmentFile=/opt/coupon-bot/.env
+ExecStart=/opt/coupon-bot/.venv/bin/python -m coupon_bot.bot
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+ProtectSystem=full
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
