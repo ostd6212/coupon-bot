@@ -22,13 +22,6 @@ def period(c: Coupon) -> str:
     return f"до {fmt(c.end)}" if c.start is None else fmt(c.end)
 
 
-def days_left(c: Coupon, today: date) -> str:
-    n = (c.end - today).days
-    if n < 0:
-        return "прострочено"
-    return {0: "сьогодні останній день", 1: "лишився 1 день"}.get(n, f"лишилось {n} дн.")
-
-
 def partner_line(c: Coupon) -> str | None:
     return f"🏪 <b>ПАРТНЕР: {escape(c.partner)}</b> (не в Carrefour)" if c.partner else None
 
@@ -75,15 +68,46 @@ def summary(c: Coupon) -> str:
     return "\n".join(lines)
 
 
-def list_lines(coupons: list[Coupon], today: date, limit: int = 40) -> str:
-    out = []
-    for i, c in enumerate(coupons[:limit], 1):
-        when = f"з {fmt(c.start)} " if c.start and c.start > today else ""
-        shop = f"🏪 {escape(c.partner)}: " if c.partner else ""
-        out.append(f"{i}. {shop}<b>{escape(c.title)}</b>\n    {when}до {fmt(c.end)} ({days_left(c, today)})")
-    if len(coupons) > limit:
-        out.append(f"… і ще {len(coupons) - limit}")
-    return "\n".join(out)
+WEEKDAYS = ["пн", "вт", "ср", "чт", "пт", "сб", "нд"]
+
+
+def short_date(d: date, today: date) -> str:
+    """'сб 31.10' (the year only when it is not the current one)."""
+    year = f".{d.year}" if d.year != today.year else ""
+    return f"{WEEKDAYS[d.weekday()]} {d:%d.%m}{year}"
+
+
+def _left(n: int) -> str:
+    emoji = "🔴" if n <= 1 else "🟠" if n <= 3 else "🟡" if n <= 7 else "🟢"
+    text = {0: "сьогодні останній день!", 1: "завтра останній день"}.get(n, f"ще {n} дн.")
+    return f"{emoji} {text}"
+
+
+def list_item(i: int, c: Coupon, today: date) -> str:
+    shop = f"🏪 {escape(c.partner)}: " if c.partner else ""
+    head = f"{i}. {TYPE_ICON.get(c.type, '🎟')} {shop}<b>{escape(c.title)}</b>"
+    if c.start and c.start > today:
+        n = (c.start - today).days
+        when = f"📅 <b>{short_date(c.start, today)} – {short_date(c.end, today)}</b>"
+        if c.start == c.end:
+            when = f"📅 <b>{short_date(c.end, today)}</b>"
+        return f"{head}\n      {when} · 🕐 почнеться {'завтра' if n == 1 else f'через {n} дн.'}"
+    return f"{head}\n      📅 до <b>{short_date(c.end, today)}</b> · {_left((c.end - today).days)}"
+
+
+def list_text(current: list[Coupon], upcoming: list[Coupon], today: date, hidden: int = 0) -> str:
+    """Numbered list in two sections; numbers match the 📷 buttons (current first, then upcoming)."""
+    blocks, n = [], 0
+    for title, items in (("🟢 Діють зараз", current), ("🕐 Ще не почали діяти", upcoming)):
+        if items:
+            lines = [f"<b>{title} ({len(items)})</b>"]
+            for c in items:
+                n += 1
+                lines.append(list_item(n, c, today))
+            blocks.append("\n".join(lines))
+    if hidden:
+        blocks.append(f"… і ще {hidden}")
+    return "\n\n".join(blocks)
 
 
 def shop_summary(coupons: list[Coupon], partner_coupons: list[Coupon] = ()) -> str:

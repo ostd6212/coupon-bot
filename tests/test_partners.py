@@ -3,7 +3,7 @@ from datetime import date
 
 from coupon_bot.db import Database
 from coupon_bot.recognize import normalize_coupon
-from coupon_bot.render import caption, list_lines, shop_summary, summary
+from coupon_bot.render import caption, list_text, shop_summary, summary
 from tests.factories import mk
 
 TODAY = date(2026, 10, 17)
@@ -27,7 +27,7 @@ def test_partner_is_marked_everywhere_the_user_looks():
     c = mk(title="10% у Feu Vert", partner="Feu Vert")
     for text in (summary(c), caption(c, "⏳ Через 3 дні")):
         assert "ПАРТНЕР: Feu Vert" in text and "не в Carrefour" in text
-    assert "🏪 Feu Vert:" in list_lines([c], date(2026, 10, 17))
+    assert "🏪 Feu Vert:" in list_text([c], [], date(2026, 10, 17))
     assert "ПАРТНЕР" not in summary(mk())
 
 

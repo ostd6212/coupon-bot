@@ -169,32 +169,35 @@ async def on_help(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(HELP_TEXT)
 
 
-async def _list(update: Update, ctx: ContextTypes.DEFAULT_TYPE, title: str, pick, empty: str) -> None:
+async def _list(update: Update, ctx: ContextTypes.DEFAULT_TYPE, now: bool, soon: bool, empty: str) -> None:
     today = _today(ctx)
-    coupons = [c for c in _db(ctx).list_active() if pick(c, today)]
-    if not coupons:
+    coupons = _db(ctx).list_active()
+    current = sorted((c for c in coupons if c.valid_on(today)), key=lambda c: (c.end, c.id)) if now else []
+    upcoming = sorted((c for c in coupons if c.start and c.start > today), key=lambda c: (c.start, c.id)) if soon else []
+    shown_now = current[:40]
+    shown_soon = upcoming[:40 - len(shown_now)]
+    ordered = shown_now + shown_soon
+    if not ordered:
         await update.message.reply_text(empty)
         return
-    shown = coupons[:40]
-    buttons = [InlineKeyboardButton(f"📷 {i}", callback_data=f"photo:{c.id}") for i, c in enumerate(shown, 1)]
+    buttons = [InlineKeyboardButton(f"📷 {i}", callback_data=f"photo:{c.id}") for i, c in enumerate(ordered, 1)]
     rows = [buttons[i:i + 5] for i in range(0, len(buttons), 5)]
+    hidden = len(current) + len(upcoming) - len(ordered)
     await update.message.reply_text(
-        f"<b>{title}</b>\n\n{render.list_lines(coupons, today)}", parse_mode=HTML,
+        render.list_text(shown_now, shown_soon, today, hidden), parse_mode=HTML,
         reply_markup=InlineKeyboardMarkup(rows))
 
 
 async def on_active(update, ctx):
-    await _list(update, ctx, "Діють зараз (найтерміновіші зверху)", lambda c, t: c.valid_on(t),
-                "Зараз немає чинних купонів.")
+    await _list(update, ctx, now=True, soon=False, empty="Зараз немає чинних купонів.")
 
 
 async def on_upcoming(update, ctx):
-    await _list(update, ctx, "Ще не почали діяти", lambda c, t: c.start is not None and c.start > t,
-                "Немає купонів, що ще не почали діяти.")
+    await _list(update, ctx, now=False, soon=True, empty="Немає купонів, що ще не почали діяти.")
 
 
 async def on_all(update, ctx):
-    await _list(update, ctx, "Усі активні й майбутні", lambda c, t: True, "Купонів поки немає. Надішли фото!")
+    await _list(update, ctx, now=True, soon=True, empty="Купонів поки немає. Надішли фото!")
 
 
 async def on_shop(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:

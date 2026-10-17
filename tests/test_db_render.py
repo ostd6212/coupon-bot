@@ -69,3 +69,18 @@ def test_caption_has_the_key_facts_and_escapes_html():
     assert "A &lt;b&gt; &amp; B" in text
     for part in ("від 40 €", "19.10.2026 – 01.11.2026", "Hiper", "картка Club"):
         assert part in text
+
+
+def test_list_text_sections_numbers_dates_and_urgency():
+    from coupon_bot.render import list_text
+    today = date(2026, 10, 17)  # Saturday
+    now = [mk(id=1, title="Завтра кінець", valid_to="2026-10-18"),
+           mk(id=2, title="Знижка", valid_to="2026-11-01")]
+    soon = [mk(id=3, title="Lindt", type="gift", valid_from="2026-10-23", valid_to="2026-10-24")]
+    text = list_text(now, soon, today)
+    assert "🟢 Діють зараз (2)" in text and "🕐 Ще не почали діяти (1)" in text
+    assert "1. 💸 <b>Завтра кінець</b>" in text and "🔴 завтра останній день" in text
+    assert "до <b>нд 01.11</b> · 🟢 ще 15 дн." in text
+    assert "3. 🎁 <b>Lindt</b>" in text  # numbering continues into the second section
+    assert "<b>пт 23.10 – сб 24.10</b> · 🕐 почнеться через 6 дн." in text
+    assert "ще 7 дн." not in text  # the old misleading "days left" for a coupon that has not started
