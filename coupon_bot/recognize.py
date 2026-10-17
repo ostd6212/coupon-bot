@@ -21,7 +21,7 @@ A photo shows one coupon or several; extract EVERY coupon that is visible. Reply
 no markdown, no commentary. Each element has exactly these keys:
 
 {{"type": "discount | gift | chequeahorro | cashback | other",
- "title": "short title in Ukrainian, e.g. «−5 € від 40 €» or «Цукерки Lindt безкоштовно»",
+ "title": "short title in Ukrainian that says exactly what the coupon gives, e.g. «−5 € від 40 €» or «Коробка цукерок Lindt з молочним шоколадом 100 г безкоштовно». For a free product keep the brand, the kind of product, the variant and the size or weight exactly as printed and never generalise (bombones = цукерки, not «шоколад»; chocolate con leche = з молочним шоколадом)",
  "value": "5 EUR / 18 EUR / 10% / the free item",
  "min_purchase_eur": number or null,
  "valid_from": "YYYY-MM-DD" or null,
