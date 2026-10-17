@@ -26,7 +26,7 @@ no markdown, no commentary. Each element has exactly these keys:
  "min_purchase_eur": number or null,
  "valid_from": "YYYY-MM-DD" or null,
  "valid_to": "YYYY-MM-DD",
- "stores": "where it is valid, as printed, e.g. Hiper, Market, Express, carrefour.es | only Hipermercado | Feu Vert",
+ "stores": "where it is valid: short, in Ukrainian, no quotes from the coupon text. Keep brand names as they are (Hiper, Market, Express, carrefour.es, Feu Vert). Examples: «Hiper, Market, Express, carrefour.es», «лише гіпермаркети Carrefour», «Feu Vert»",
  "partner": "name of the partner company if the coupon is redeemed at a third party and NOT in Carrefour stores or carrefour.es (e.g. Feu Vert), otherwise null",
  "requires_club_card": true or false,
  "ends_saturday_if_sunday_closed": true or false,

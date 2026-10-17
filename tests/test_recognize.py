@@ -77,6 +77,8 @@ def test_request_shape():
     call = client.calls[0]
     assert call["model"] == "claude-haiku-5-5"
     assert "2026-10-17" in call["system"]  # today is injected for year inference
+    assert "лише гіпермаркети Carrefour" in call["system"]  # stores come back in Ukrainian, not English
+    assert "only Hipermercado" not in call["system"]
     assert call["messages"][0]["content"][0]["source"]["media_type"] == "image/jpeg"
 
 
