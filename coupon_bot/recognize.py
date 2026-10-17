@@ -30,7 +30,7 @@ no markdown, no commentary. Each element has exactly these keys:
  "partner": "name of the partner company if the coupon is redeemed at a third party and NOT in Carrefour stores or carrefour.es (e.g. Feu Vert), otherwise null",
  "requires_club_card": true or false,
  "ends_saturday_if_sunday_closed": true or false,
- "conditions_uk": "1-3 short sentences in Ukrainian: restrictions and exceptions",
+ "conditions_uk": "1-3 short sentences in Ukrainian with ONLY the extra restrictions and exceptions (limits per day or per receipt, excluded goods, how a gift is priced). Do not repeat the title, the purchase threshold, the dates or the stores. null if there are none",
  "barcode": "the digits printed under the barcode, or null",
  "raw_text": "all text you can read on the coupon"}}
 

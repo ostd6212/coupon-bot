@@ -21,7 +21,7 @@ from telegram.ext import (
 
 from . import render
 from .config import Config, load_config
-from .dates import fmt, parse_user_date
+from .dates import fmt
 from .db import Coupon, Database
 from .recognize import recognize
 from .reminders import HEADINGS, evening_kind, morning_kinds
@@ -82,7 +82,6 @@ def _photo_file(cfg: Config, c: Coupon) -> Path | None:
 
 def _kb_new(cid: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([[
-        InlineKeyboardButton("✏️ Виправити дату", callback_data=f"fix:{cid}"),
         InlineKeyboardButton("🗑 Видалити", callback_data=f"del:{cid}"),
     ]])
 
@@ -258,31 +257,12 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     elif action == "used":
         db.set_status(c.id, "used")
         await _finish(q, "✅ Використано, нагадувань більше не буде")
-    elif action == "fix":
-        ctx.user_data["fix_coupon"] = c.id
-        await q.message.reply_text(
-            f"Введи нову дату закінчення для «{c.title}» у форматі ДД.ММ або ДД.ММ.РРРР")
     elif action == "photo":
         await send_coupon(ctx.bot, q.message.chat_id, _cfg(ctx), c)
 
 
 async def on_text(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
-    cid = ctx.user_data.get("fix_coupon")
-    if cid is None:
-        await update.message.reply_text("Надішли фото купона, або дивись /help.")
-        return
-    db, today = _db(ctx), _today(ctx)
-    new_end = parse_user_date(update.message.text, today)
-    c = db.get(cid)
-    if new_end is None:
-        await update.message.reply_text("Не зрозумів дату. Приклад: 31.10 або 14.11.2026")
-        return
-    if c is None or (c.start and new_end < c.start):
-        await update.message.reply_text("Дата закінчення не може бути раніше початку дії купона. Спробуй ще раз.")
-        return
-    db.update_valid_to(cid, new_end)
-    ctx.user_data.pop("fix_coupon", None)
-    await update.message.reply_text(f"✅ Оновлено: «{c.title}» діє до {fmt(new_end)}")
+    await update.message.reply_text("Надішли фото купона, або дивись /help.")
 
 
 # -- scheduled jobs -----------------------------------------------------------
@@ -374,7 +354,7 @@ def build_application(cfg: Config) -> Application:
     app.add_handler(CommandHandler("all", on_all))
     app.add_handler(CommandHandler("shop", on_shop))
     app.add_handler(MessageHandler(filters.PHOTO | filters.Document.IMAGE, on_photo))
-    app.add_handler(CallbackQueryHandler(on_button, pattern=r"^(fix|del|used|photo):\d+$"))
+    app.add_handler(CallbackQueryHandler(on_button, pattern=r"^(del|used|photo):\d+$"))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, on_text))
     app.add_error_handler(on_error)
 

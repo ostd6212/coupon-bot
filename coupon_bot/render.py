@@ -50,8 +50,6 @@ def summary(c: Coupon) -> str:
     """Shown right after recognition."""
     lines = [partner_line(c)] if c.partner else []
     lines.append(f"{TYPE_ICON.get(c.type, '🎟')} <b>{escape(c.title)}</b>")
-    if c.value:
-        lines.append(f"Цінність: {escape(c.value)}")
     if c.min_purchase_eur:
         lines.append(f"Умова: від {money(c.min_purchase_eur)} €")
     lines.append(f"Діє: {'з ' + fmt(c.start) + ' ' if c.start else ''}до {fmt(c.end)}")

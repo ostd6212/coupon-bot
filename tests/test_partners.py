@@ -54,3 +54,7 @@ def test_old_database_gets_partner_column_and_backfill(tmp_path):
     db = Database(path)
     assert [c.partner for c in db.list_active()] == ["Feu Vert", None]
     Database(path)  # second start: migration is a no-op
+
+
+def test_summary_has_no_value_line_and_no_edit_button_text():
+    assert "Цінність" not in summary(mk(value="5 EUR"))
