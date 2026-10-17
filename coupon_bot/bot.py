@@ -24,7 +24,7 @@ from .config import Config, load_config
 from .dates import fmt
 from .db import Coupon, Database
 from .recognize import recognize
-from .reminders import HEADINGS, evening_kind, morning_kinds, upcoming
+from .reminders import HEADINGS, Planned, evening_kind, morning_kinds, upcoming
 
 log = logging.getLogger(__name__)
 HTML = ParseMode.HTML
@@ -229,12 +229,45 @@ async def on_shop(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(render.shop_summary(coupons, partners), parse_mode=HTML)
 
 
-async def on_reminders(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+def _planned(ctx) -> list[Planned]:
     cfg, db = _cfg(ctx), _db(ctx)
-    now = datetime.now(cfg.tz)
     coupons = db.list_active()
     sent = {c.id: db.reminders_sent(c.id) for c in coupons}
-    planned = upcoming(coupons, now, cfg.reminder_hour, cfg.evening_hour, sent)
+    return upcoming(coupons, datetime.now(cfg.tz), cfg.reminder_hour, cfg.evening_hour, sent)
+
+
+async def deliver_test(bot, cfg: Config, p: Planned) -> list[tuple[int, str | None]]:
+    """Send one planned reminder to every allowed user (marked as a test, not recorded as sent).
+
+    Returns (user id, error or None) so a user who never pressed /start shows up.
+    """
+    results = []
+    for uid in sorted(cfg.allowed_user_ids):
+        try:
+            await send_coupon(bot, uid, cfg, p.coupon, f"🧪 ТЕСТ · {HEADINGS[p.kind]}")
+            results.append((uid, None))
+        except TelegramError as e:
+            log.warning("test reminder to %s failed: %s", uid, e)
+            results.append((uid, str(e)))
+    return results
+
+
+async def on_testreminder(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    planned = _planned(ctx)
+    n = int(ctx.args[0]) if ctx.args and ctx.args[0].isdigit() else 1
+    if not 1 <= n <= len(planned):
+        await update.message.reply_text("Немає такого нагадування. Номери дивись у /reminders.")
+        return
+    results = await deliver_test(ctx.bot, _cfg(ctx), planned[n - 1])
+    lines = [f"✅ {uid}: доставлено" if err is None else
+             f"❌ {uid}: {err} (цей користувач має натиснути /start у боті)" for uid, err in results]
+    await update.message.reply_text(f"Тестове нагадування №{n} надіслано:\n" + "\n".join(lines))
+
+
+async def on_reminders(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    cfg = _cfg(ctx)
+    now = datetime.now(cfg.tz)
+    planned = _planned(ctx)
     if not planned:
         await update.message.reply_text("Запланованих нагадувань немає.")
         return
@@ -243,7 +276,7 @@ async def on_reminders(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
                for i, p in enumerate(shown, 1)]
     rows = [buttons[i:i + 5] for i in range(0, len(buttons), 5)]
     await update.message.reply_text(
-        render.reminders_text(shown, now.date(), len(planned) - len(shown)) + "\n\n👁 — показати, як виглядатиме нагадування.",
+        render.reminders_text(shown, now.date(), len(planned) - len(shown)) + "\n\n👁 — показати, як виглядатиме нагадування (тільки тобі).\n/testreminder N — надіслати це нагадування тестово всім.",
         parse_mode=HTML, reply_markup=InlineKeyboardMarkup(rows))
 
 
@@ -358,6 +391,7 @@ async def post_init(app: Application) -> None:
         BotCommand("all", "Усі активні й майбутні"),
         BotCommand("shop", "Я в магазині: фото чинних купонів"),
         BotCommand("reminders", "Заплановані нагадування"),
+        BotCommand("testreminder", "Надіслати тестове нагадування всім"),
         BotCommand("help", "Довідка"),
     ])
 
@@ -385,6 +419,7 @@ def build_application(cfg: Config) -> Application:
     app.add_handler(CommandHandler("all", on_all))
     app.add_handler(CommandHandler("shop", on_shop))
     app.add_handler(CommandHandler("reminders", on_reminders))
+    app.add_handler(CommandHandler("testreminder", on_testreminder))
     app.add_handler(MessageHandler(filters.PHOTO | filters.Document.IMAGE, on_photo))
     app.add_handler(CallbackQueryHandler(on_preview, pattern=r"^prev:\d+:[a-z0-9]+$"))
     app.add_handler(CallbackQueryHandler(on_button, pattern=r"^(del|used|photo):\d+$"))

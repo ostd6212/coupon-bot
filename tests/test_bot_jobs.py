@@ -71,3 +71,17 @@ def test_evening_reminder_for_short_promo(tmp_path):
     add(db, title="Lindt", valid_from="2026-10-23", valid_to="2026-10-24")
     asyncio.run(run_reminders(app, evening=True, today=date(2026, 10, 22)))
     assert len(bot.sent) == 2 and "Завтра починає діяти" in bot.sent[0][1]
+
+
+def test_test_reminder_goes_to_everyone_reports_failures_and_records_nothing(tmp_path):
+    from coupon_bot.bot import deliver_test
+    from coupon_bot.reminders import Planned
+
+    bot = FakeBot(fail_for={20})
+    app, db = make_app(tmp_path, bot)
+    cid = add(db, valid_from="2026-10-19", valid_to="2026-11-01")
+    p = Planned(date(2026, 10, 19), 9, "start", db.get(cid))
+    results = asyncio.run(deliver_test(bot, app.bot_data["cfg"], p))
+    assert [(uid, err is None) for uid, err in results] == [(10, True), (20, False)]
+    assert bot.sent[0][0] == 10 and "🧪 ТЕСТ" in bot.sent[0][1]
+    assert db.reminders_sent(cid) == set()  # a test must not use up the real reminder
