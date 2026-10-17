@@ -82,7 +82,6 @@ def _photo_file(cfg: Config, c: Coupon) -> Path | None:
 
 def _kb_new(cid: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([[
-        InlineKeyboardButton("✅ Все вірно", callback_data=f"ok:{cid}"),
         InlineKeyboardButton("✏️ Виправити дату", callback_data=f"fix:{cid}"),
         InlineKeyboardButton("🗑 Видалити", callback_data=f"del:{cid}"),
     ]])
@@ -155,7 +154,7 @@ async def on_photo(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         cid = db.add_coupon(update.effective_user.id, item, str(rel))
         c = db.get(cid)
         saved += 1
-        await with_retry(lambda: msg.reply_text(render.summary(c), parse_mode=HTML, reply_markup=_kb_new(cid)))
+        await with_retry(lambda: msg.reply_text("✅ Збережено\n" + render.summary(c), parse_mode=HTML, reply_markup=_kb_new(cid)))
     if not saved:
         (cfg.data_dir / rel).unlink(missing_ok=True)
 
@@ -246,9 +245,7 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         await q.answer("Купон не знайдено")
         return
     await q.answer()
-    if action == "ok":
-        await _finish(q, "✅ Збережено")
-    elif action == "del":
+    if action == "del":
         db.set_status(c.id, "deleted")
         await _finish(q, "🗑 Видалено")
     elif action == "used":
@@ -370,7 +367,7 @@ def build_application(cfg: Config) -> Application:
     app.add_handler(CommandHandler("all", on_all))
     app.add_handler(CommandHandler("shop", on_shop))
     app.add_handler(MessageHandler(filters.PHOTO | filters.Document.IMAGE, on_photo))
-    app.add_handler(CallbackQueryHandler(on_button, pattern=r"^(ok|fix|del|used|photo):\d+$"))
+    app.add_handler(CallbackQueryHandler(on_button, pattern=r"^(fix|del|used|photo):\d+$"))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, on_text))
     app.add_error_handler(on_error)
 
